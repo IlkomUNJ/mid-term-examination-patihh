@@ -22,35 +22,67 @@ void DrawingCanvas::paintLines(){
     update();
 }
 
-void DrawingCanvas::segmentDetection(){
-    QPixmap pixmap = this->grab(); //
+void DrawingCanvas::segmentDetection() {
+    QPixmap pixmap = this->grab();
     QImage image = pixmap.toImage();
 
-    cout << "image width " << image.width() << endl;
-    cout << "image height " << image.height() << endl;
+    int width = image.width();
+    int height = image.height();
+    if (width == 0 || height == 0) return;
 
-    //To not crash we set initial size of the matrix
-    vector<CustomMatrix> windows(image.width()*image.height());
+    QVector<QVector<int>> pixelMap(height, QVector<int>(width, 0));
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            QRgb rgb = image.pixel(x, y);
+            if (rgb != 0xffffffff)
+                pixelMap[y][x] = 1;
+        }
+    }
 
-    // Get the pixel value as an ARGB integer (QRgb is a typedef for unsigned int)
-    for(int i = 1; i < image.width()-1;i++){
-        for(int j = 1; j < image.height()-1;j++){
-            bool local_window[3][3] = {false};
+    m_windows.clear();
+    m_nonEmptyCenters.clear();
 
-            for(int m=-1;m<=1;m++){
-                for(int n=-1;n<=1;n++){
-                    QRgb rgbValue = image.pixel(i+m, j+n);
-                    local_window[m+1][n+1] = (rgbValue != 0xffffffff);
+    const int windowSize = 3;
+    const int halfWin = windowSize / 2;
+
+    for (int y = halfWin; y < height - halfWin; ++y) {
+        for (int x = halfWin; x < width - halfWin; ++x) {
+            QVector<int> window;
+            bool hasPoint = false;
+
+            for (int dy = -halfWin; dy <= halfWin; ++dy) {
+                for (int dx = -halfWin; dx <= halfWin; ++dx) {
+                    int val = pixelMap[y + dy][x + dx];
+                    window.append(val);
+                    if (val == 1)
+                        hasPoint = true;
                 }
             }
 
-            CustomMatrix mat(local_window);
-
-            windows.push_back(mat);
+            if (hasPoint) {
+                m_windows.append(window);
+                m_nonEmptyCenters.append(QPoint(x, y));
+            }
         }
     }
-    return;
+
+    qDebug() << "Total non-empty windows:" << m_nonEmptyCenters.size();
+
+    for (int i = 0; i < m_windows.size(); ++i) {
+        const QVector<int> &win = m_windows[i];
+        int count = 0;
+        for (int v : win) count += v;
+
+        QPoint center = m_nonEmptyCenters[i];
+
+        if (count == 1) {
+            qDebug() << "Endpoint at" << center;
+        } else if (count == 3 || count == 5) {
+            qDebug() << "Possible corner at" << center;
+        }
+    }
 }
+
 
 void DrawingCanvas::paintEvent(QPaintEvent *event){
     QPainter painter(this);
