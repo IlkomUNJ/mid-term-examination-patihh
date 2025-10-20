@@ -126,5 +126,3 @@ void DrawingCanvas::mousePressEvent(QMouseEvent *event) {
     // Trigger a repaint
     update();
 }
-
-
